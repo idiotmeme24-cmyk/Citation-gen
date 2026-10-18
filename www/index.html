@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1c1c19">
+<title>Citation Generator</title>
+<script src="xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#1c1c19;--panel:#26261f;--panel2:#2f2f27;--border:#46453b;--text:#ece7d8;--dim:#a8a396;
+  --accent:#c99a3e;--accent-dim:#8a6a2c;--onaccent:#fff2d8;--ok:#6b9c5e;--err:#e07a68;
+  --mono:ui-monospace,'JetBrains Mono','Courier New',monospace;
+  --sans:-apple-system,'Inter','Segoe UI',Roboto,sans-serif;
+  color-scheme:dark;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);
+}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){
+  --bg:#f4f1e8;--panel:#fffdf6;--panel2:#efeadb;--border:#d3ccb8;--text:#2a2820;--dim:#6d6858;
+  --accent:#9a6f12;--accent-dim:#b8862a;--onaccent:#fff;--ok:#3f7a35;--err:#b0402f;color-scheme:light;}}
+:root[data-theme="light"]{
+  --bg:#f4f1e8;--panel:#fffdf6;--panel2:#efeadb;--border:#d3ccb8;--text:#2a2820;--dim:#6d6858;
+  --accent:#9a6f12;--accent-dim:#b8862a;--onaccent:#fff;--ok:#3f7a35;--err:#b0402f;color-scheme:light;}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);
+  padding:0 14px calc(96px + env(safe-area-inset-bottom,0px));max-width:640px;margin-inline:auto}
+header{display:flex;align-items:center;justify-content:space-between;padding:16px 2px 12px}
+h1{font-size:19px;margin:0;font-weight:650}
+h1 span{color:var(--accent)}
+.tag{font-family:var(--mono);font-size:11px;color:var(--dim)}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px}
+h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin:0 0 12px;font-weight:650}
+label.f{display:block;font-size:13px;color:var(--dim);margin:14px 0 5px}
+label.f:first-of-type{margin-top:0}
+input[type=text],input[type=search],textarea{width:100%;background:var(--panel2);border:1px solid var(--border);
+  border-radius:8px;color:var(--text);font-family:var(--mono);font-size:16px;padding:12px;min-height:46px;outline:none}
+input:focus,textarea:focus{border-color:var(--accent)}
+textarea{resize:vertical;min-height:110px}
+input[type=file]{display:none}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.btn{background:var(--panel2);border:1px solid var(--border);color:var(--text);font:500 15px var(--sans);
+  padding:12px 16px;border-radius:10px;min-height:46px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.btn:active{transform:scale(.98)}
+.btn.primary{background:var(--accent-dim);border-color:var(--accent);color:var(--onaccent)}
+.grow{flex:1}
+.status{font-family:var(--mono);font-size:12px;margin-top:10px;min-height:16px}
+.status.ok{color:var(--ok)}.status.err{color:var(--err)}
+.hint{font-size:12px;color:var(--dim);margin-top:10px;line-height:1.55}
+.hint code{background:var(--panel2);padding:1px 5px;border-radius:4px;color:var(--accent);word-break:break-all}
+.results{margin-top:8px;max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;display:none}
+.results.show{display:block}
+.rr{padding:12px;font-family:var(--mono);font-size:13px;border-bottom:1px solid var(--border);cursor:pointer}
+.rr:last-child{border-bottom:0}
+.rr:active{background:var(--panel2)}
+.rr .m{display:block;color:var(--dim);font-size:11px;margin-top:3px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.chip{background:var(--panel2);border:1px solid var(--border);border-radius:20px;padding:8px 8px 8px 12px;
+  font-family:var(--mono);font-size:13px;display:flex;align-items:center;gap:8px}
+.chip .x{width:24px;height:24px;border-radius:50%;background:var(--border);color:var(--text);display:grid;place-items:center;font-size:14px;cursor:pointer}
+.empty{color:var(--dim);font-size:12px;font-family:var(--mono);margin-top:12px}
+.sum{font-family:var(--mono);font-size:13px;color:var(--dim);margin-top:12px;line-height:1.8}
+.sum b{color:var(--accent);font-weight:650}
+.arrest{display:none}
+.arrest-mode .arrest{display:block}
+.checks{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.chk{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text);background:var(--panel2);
+  border:1px solid var(--border);border-radius:10px;padding:12px 14px;flex:1;min-width:140px}
+.chk input{width:20px;height:20px;accent-color:var(--accent)}
+.out{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:var(--mono);
+  font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;min-height:200px}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-top:1px solid var(--border);
+  padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px));z-index:5}
+.bar .in{max-width:640px;margin:0 auto;display:flex;gap:8px}
+.bar .btn{flex:1}
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:14px;padding:20px;max-width:90vw;width:380px}
+dialog::backdrop{background:rgba(0,0,0,.6)}
+dialog p{margin:0 0 16px;line-height:1.5;font-size:15px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Citation <span>Generator</span></h1>
+  <span class="tag">stays on your device</span>
+</header>
+
+<div class="panel">
+  <h2>1. Penal code list</h2>
+  <div class="row">
+    <label class="btn grow" for="fileInput">Upload .txt or .xlsx</label>
+    <input type="file" id="fileInput" accept=".txt,.xlsx,.xls,text/plain">
+    <button class="btn" id="clearCodes">Clear</button>
+  </div>
+  <div class="status" id="uploadStatus"></div>
+  <div class="hint">
+    .txt: one code per line, <code>code|offense|classification|fine|jailtime</code><br>
+    .xlsx: columns Code, Offense, Classification, Fine, Jailtime. Header row optional.<br>
+    Example: <code>1(01)|Criminal threats|Misdemeanor|0|60</code>
+  </div>
+
+  <label class="f" for="codeSearch" style="margin-top:18px">Search and add penal codes</label>
+  <input type="search" id="codeSearch" placeholder="Type a code or keyword" autocomplete="off">
+  <div class="results" id="codeResults"></div>
+  <div class="chips" id="chips"></div>
+  <div class="empty" id="chipsEmpty">No penal codes added yet.</div>
+  <div class="sum" id="summary"></div>
+</div>
+
+<div class="panel" id="details">
+  <h2>2. Citation details</h2>
+  <label class="f" for="username">Recipient userID</label>
+  <input type="text" id="username" placeholder="@username" autocapitalize="off" autocomplete="off">
+  <label class="f" for="deptName">Department name</label>
+  <input type="text" id="deptName" placeholder="Greenville Police Department">
+  <label class="f" for="rank">Rank</label>
+  <input type="text" id="rank" placeholder="Officer">
+  <label class="f" for="officerSig">Officer signature</label>
+  <input type="text" id="officerSig" placeholder="J. Smith">
+  <label class="f" for="badgeNum">Badge number</label>
+  <input type="text" id="badgeNum" placeholder="1234" inputmode="numeric">
+  <div class="arrest">
+    <label class="f" for="incidentDesc">Incident description</label>
+    <textarea id="incidentDesc" placeholder="Describe the incident..."></textarea>
+    <div class="checks">
+      <label class="chk"><input type="checkbox" id="warrantNeeded"> Warrant needed</label>
+      <label class="chk"><input type="checkbox" id="servingWarrant"> Serving warrant</label>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>3. Result</h2>
+  <div class="out" id="output">Add penal codes and fill in the details, then tap Generate.</div>
+  <div class="status" id="copyStatus"></div>
+</div>
+
+<div class="bar"><div class="in">
+  <button class="btn primary" id="generateBtn">Generate</button>
+  <button class="btn" id="copyBtn">Copy</button>
+  <button class="btn" id="shareBtn">Share</button>
+</div></div>
+
+<dialog id="dlg">
+  <p id="dlgText"></p>
+  <div class="row"><button class="btn grow" id="dlgNo">Cancel</button><button class="btn primary grow" id="dlgYes">Generate</button></div>
+</dialog>
+
+<script>
+var codeList = [], selected = [];
+var $ = function(id){ return document.getElementById(id); };
+var FIELDS = ['deptName','rank','officerSig','badgeNum'];
+
+function store(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+function load(k){ try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch(e){ return null; } }
+
+function setStatus(el, msg, err){ el.textContent = msg; el.className = 'status ' + (err ? 'err' : 'ok'); }
+function uniq(a){ var o = []; a.forEach(function(v){ if (o.indexOf(v) === -1) o.push(v); }); return o; }
+function sum(k){ return selected.reduce(function(s, r){ return s + (r[k] || 0); }, 0); }
+
+function parseTxt(text){
+  var rows = [];
+  text.split(/\r?\n/).forEach(function(line){
+    var t = line.trim(); if (!t) return;
+    var p = t.split('|').map(function(x){ return x.trim(); });
+    if (!p[0]) return;
+    if (p[0].toLowerCase() === 'code' && p.length > 1) return;
+    rows.push({code:p[0], type:p[1]||'', classification:p[2]||'', fine:parseFloat(p[3])||0, jailtime:parseFloat(p[4])||0});
+  });
+  return rows;
+}
+function parseXlsx(buf){
+  var wb = XLSX.read(buf, {type:'array'});
+  var rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1});
+  var out = [];
+  rows.forEach(function(r, i){
+    if (!r || !r.length) return;
+    var code = String(r[0] || '').trim(); if (!code) return;
+    if (i === 0 && code.toLowerCase() === 'code') return;
+    out.push({code:code, type:String(r[1]||'').trim(), classification:String(r[2]||'').trim(), fine:parseFloat(r[3])||0, jailtime:parseFloat(r[4])||0});
+  });
+  return out;
+}
+function loaded(rows, name){
+  codeList = rows; store('cg_codes', rows);
+  setStatus($('uploadStatus'), 'Loaded ' + rows.length + ' penal codes from ' + name, false);
+}
+
+$('fileInput').addEventListener('change', function(e){
+  var file = e.target.files[0], st = $('uploadStatus'); if (!file) return;
+  var n = file.name.toLowerCase(), rd = new FileReader();
+  rd.onerror = function(){ setStatus(st, 'Could not read file.', true); };
+  if (n.endsWith('.txt')) {
+    rd.onload = function(ev){ loaded(parseTxt(ev.target.result), file.name); };
+    rd.readAsText(file);
+  } else if (n.endsWith('.xlsx') || n.endsWith('.xls')) {
+    rd.onload = function(ev){
+      try { loaded(parseXlsx(ev.target.result), file.name); }
+      catch(err){ setStatus(st, 'Could not parse spreadsheet.', true); }
+    };
+    rd.readAsArrayBuffer(file);
+  } else setStatus(st, 'Use a .txt or .xlsx file.', true);
+  e.target.value = '';
+});
+
+$('clearCodes').addEventListener('click', function(){
+  codeList = []; store('cg_codes', []); $('uploadStatus').textContent = '';
+});
+
+var search = $('codeSearch'), results = $('codeResults');
+search.addEventListener('input', function(){
+  var q = search.value.trim().toLowerCase();
+  results.innerHTML = '';
+  if (!q) { results.classList.remove('show'); return; }
+  var m = codeList.filter(function(r){
+    return r.code.toLowerCase().indexOf(q) !== -1 || r.type.toLowerCase().indexOf(q) !== -1;
+  }).slice(0, 25);
+  if (!m.length) { results.classList.remove('show'); return; }
+  m.forEach(function(r){
+    var d = document.createElement('div'); d.className = 'rr';
+    d.appendChild(document.createTextNode(r.code + '  ' + r.type));
+    var meta = document.createElement('span'); meta.className = 'm';
+    var t = r.classification;
+    if (r.fine) t += '  $' + r.fine.toFixed(2);
+    if (r.jailtime) t += '  ' + r.jailtime + 's jail';
+    meta.textContent = t; d.appendChild(meta);
+    d.addEventListener('click', function(){
+      if (!selected.some(function(s){ return s.code === r.code; })) { selected.push(r); renderSelected(); }
+      search.value = ''; results.classList.remove('show');
+    });
+    results.appendChild(d);
+  });
+  results.classList.add('show');
+});
+
+function renderSelected(){
+  var chips = $('chips'); chips.innerHTML = '';
+  $('chipsEmpty').style.display = selected.length ? 'none' : 'block';
+  selected.forEach(function(r, i){
+    var c = document.createElement('div'); c.className = 'chip';
+    var l = document.createElement('span'); l.textContent = r.code;
+    var x = document.createElement('span'); x.className = 'x'; x.textContent = '×';
+    x.addEventListener('click', function(){ selected.splice(i, 1); renderSelected(); });
+    c.appendChild(l); c.appendChild(x); chips.appendChild(c);
+  });
+  var jail = sum('jailtime');
+  $('details').classList.toggle('arrest-mode', jail > 0);
+  var s = $('summary');
+  if (!selected.length) { s.innerHTML = ''; return; }
+  var types = uniq(selected.map(function(r){ return r.type; }).filter(Boolean));
+  var cls = uniq(selected.map(function(r){ return r.classification; }).filter(Boolean));
+  s.innerHTML = 'Type: <b></b><br>Classification: <b></b><br>Total fine: <b>$' + sum('fine').toFixed(2) +
+    '</b><br>Total jail time: <b>' + jail + 's</b>';
+  var b = s.querySelectorAll('b');
+  b[0].textContent = types.join(', ') || '-';
+  b[1].textContent = cls.join(', ') || '-';
+}
+
+function build(){
+  var g = function(id, d){ return $(id).value.trim() || d; };
+  var username = g('username', '{@username}');
+  var deptName = g('deptName', 'Dept. Name Here');
+  var rank = g('rank', 'Rank Here');
+  var sig = g('officerSig', 'Sign. Here');
+  var badge = g('badgeNum', 'Badge Num. Here');
+  var fine = sum('fine'), jail = sum('jailtime');
+
+  if (jail > 0) {
+    var desc = $('incidentDesc').value.trim();
+    var wn = $('warrantNeeded').checked ? 'YES' : 'NO';
+    var sw = $('servingWarrant').checked ? 'YES' : 'NO';
+    var offs = selected.map(function(r){
+      var l = r.code + ' - ' + r.type;
+      if (r.classification) l += ' (' + r.classification + ')';
+      return l;
+    }).join('\n');
+    return 'Violator username: <@' + username + '>\n' +
+'Arresting Officer username: ** Invalid_furniture **\n' +
+'Law Enforcement username(s): ** ' + sig + ' **\n' +
+'Ranks: ** ' + rank + ' **\n' +
+'Badge Number: ** ' + badge + ' **\n\n' +
+'__Description of the incident__\n' + (desc || '') + '\n\n\n' +
+'---\n\n' +
+'__Offense:__\n' + offs + '\n\n' +
+'Total: **$' + fine.toFixed(2) + '** + **' + jail + 's Jail Time**\n\n' +
+'Warrant needed: **' + wn + '**\n' +
+'Serving Warrant: **' + sw + '**\n\n' +
+'Sign at the X:\n' +
+'X <@' + username + '>\n\n' +
+'Arresting officer signature X:\n' +
+'X ** ' + sig + ' **\n\n' +
+'4000 Capitol Drive, Greenville, Wisconsin 54942\n\n' +
+'**You must pay the citation to <@1387636113123966986>**\n' +
+'Court date: XX/XX/XX\n' +
+'Please call (262) 785-4700 ext. 7 for further inquiry.';
+  }
+  var types = uniq(selected.map(function(r){ return r.type; }).filter(Boolean)).join(', ');
+  var cls = uniq(selected.map(function(r){ return r.classification; }).filter(Boolean)).join(', ');
+  var codes = selected.map(function(r){ return r.code; }).join(', ');
+  var rs = rank + (sig ? ' ' + sig : '');
+  return 'Recipient Ping: <@' + username + '>\n' +
+'Type of Ticket: ' + types + '\n' +
+'Classification: ' + cls + '\n' +
+'Penal Code(s): ' + codes + '\n' +
+'Total Amount Due: **$' + fine.toFixed(2) + '**\n' +
+'Department Name: **' + deptName + '**\n' +
+'Rank and Signature: **' + rs + '**\n' +
+'Badge Number: **' + badge + '**\n\n\n' +
+'**You must pay the citation to <@1387636113123966986>**\n\n' +
+'Recipients Signature at the X:\n' +
+'X: <@' + username + '>\n\n' +
+'4000 Capitol Drive, Greenville, Wisconsin 54942\n\n' +
+'Court date: XX/XX/XXXX \n' +
+'Please call (262) 785-4700 ext. 7 for further inquiry.\n' +
+'-# By signing this citation, you acknowledge that this is NOT an admission of guilt, it is to simply ensure the citation is taken care of. Your court date is shown below, and failure to show will result in a warrant for your arrest. If you have any questions, please contact a Supervisor.';
+}
+
+function run(){
+  $('output').textContent = build();
+  $('output').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+$('generateBtn').addEventListener('click', function(){
+  if (!selected.length) { $('output').textContent = 'Add at least one penal code first.'; $('output').scrollIntoView({behavior:'smooth'}); return; }
+  var jail = sum('jailtime');
+  if (jail > 0) {
+    $('dlgText').textContent = 'One or more selected offenses include jail time (' + jail + 's). Generate using the jail template?';
+    $('dlg').showModal();
+  } else run();
+});
+$('dlgNo').addEventListener('click', function(){ $('dlg').close(); });
+$('dlgYes').addEventListener('click', function(){ $('dlg').close(); run(); });
+
+function copyText(t){
+  var st = $('copyStatus');
+  function fallback(){
+    var ta = document.createElement('textarea'); ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    var ok = false; try { ok = document.execCommand('copy'); } catch(e){}
+    document.body.removeChild(ta);
+    setStatus(st, ok ? 'Copied.' : 'Copy failed. Select the text and copy manually.', !ok);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(t).then(function(){ setStatus(st, 'Copied.', false); }).catch(fallback);
+  } else fallback();
+  setTimeout(function(){ st.textContent = ''; }, 2500);
+}
+$('copyBtn').addEventListener('click', function(){ copyText($('output').textContent); });
+$('shareBtn').addEventListener('click', function(){
+  var t = $('output').textContent;
+  if (navigator.share) navigator.share({text: t}).catch(function(){});
+  else copyText(t);
+});
+
+FIELDS.forEach(function(id){
+  var saved = load('cg_' + id); if (saved) $(id).value = saved;
+  $(id).addEventListener('input', function(){ store('cg_' + id, $(id).value); });
+});
+var saved = load('cg_codes');
+if (saved && saved.length) {
+  codeList = saved;
+  setStatus($('uploadStatus'), 'Restored ' + saved.length + ' saved penal codes.', false);
+}
+renderSelected();
+</script>
+</body>
+</html>
